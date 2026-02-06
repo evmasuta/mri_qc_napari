@@ -156,6 +156,9 @@ class ControlPanel(QtWidgets.QWidget):
         self.combo = KeyComboBox()
         self.btn_prev = QtWidgets.QPushButton("◀ Prev")
         self.btn_next = QtWidgets.QPushButton("Next ▶")
+        
+        self.btn_next_unviewed = QtWidgets.QPushButton("Next unviewed ⏭")
+        self.btn_next_unviewed.setMinimumHeight(32)
 
         self.lbl_status = QtWidgets.QLabel("Status: —")
         self.lbl_status.setWordWrap(True)
@@ -185,6 +188,8 @@ class ControlPanel(QtWidgets.QWidget):
         layout.addWidget(QtWidgets.QLabel("Slice key"))
         layout.addWidget(self.combo)
         layout.addLayout(nav_layout)
+        layout.addSpacing(10)
+        layout.addWidget(self.btn_next_unviewed)
         layout.addSpacing(10)
         layout.addWidget(self.lbl_status)
         layout.addSpacing(10)
@@ -268,6 +273,8 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(self.panel, stretch=0)
         layout.addWidget(self.viewer.window._qt_window, stretch=1)
         self.setCentralWidget(central)
+        self.installEventFilter(self)
+
 
         self.cur_idx = 0
         self._loading = False
@@ -276,6 +283,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.panel.sig_next.connect(self.on_next)
         self.panel.sig_select_idx.connect(self.on_select_idx)
         self.panel.sig_rating_changed.connect(self.on_rating_changed)
+        self.panel.btn_next_unviewed.clicked.connect(self.goto_next_unviewed)
+
 
         # self.load_idx(0)
         # Defer first load until after the window is shown
@@ -317,6 +326,47 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         if 0 <= idx < len(self.keys):
             self.load_idx(idx)
+
+    def eventFilter(self, obj, event):
+        if event.type() == QtCore.QEvent.KeyPress:
+            key = event.key()
+
+            # Ratings: 0–3
+            if key in (QtCore.Qt.Key_0, QtCore.Qt.Key_1, QtCore.Qt.Key_2, QtCore.Qt.Key_3):
+                rating = int(event.text())
+                self.panel.set_rating_buttons(rating)
+                self.on_rating_changed(rating)
+                return True
+
+            # Navigation
+            if key == QtCore.Qt.Key_Left:
+                self.on_prev()
+                return True
+
+            if key == QtCore.Qt.Key_Right:
+                self.on_next()
+                return True
+
+        return super(MainWindow, self).eventFilter(obj, event)
+
+
+    def goto_next_unviewed(self):
+        n = len(self.keys)
+        if n == 0:
+            return
+
+        start = (self.cur_idx + 1) % n
+        idx = start
+
+        while True:
+            key = self.keys[idx]
+            if not self.store.is_viewed(key):
+                self.load_idx(idx)
+                return
+            idx = (idx + 1) % n
+            if idx == start:
+                break  # all viewed
+
 
     def on_rating_changed(self, rating: int):
         if self._loading:

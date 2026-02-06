@@ -23,8 +23,10 @@ The GUI will display time as a Napari time axis (frames).
 - Navigate keys via:
   - Dropdown (color-coded: green = viewed, red = not-viewed)
   - Previous / Next buttons
+  - Next unviewed button (skips reviewed slices)
 - Rate each slice on a **0–3** scale (radio buttons; single choice)
 - Marks a slice as **viewed** when it is loaded
+- Auto-plays cine/time-series slices on load (when `timepoints > 1`)
 - **Writes/overwrites the CSV** whenever:
   - You change the rating, or
   - You navigate to a different slice
@@ -33,13 +35,12 @@ The GUI will display time as a Napari time axis (frames).
 
 Create an environment with Python 3.9 (3.7–3.9 should work). Example:
 
-1) conda create -n qc-gui python=3.9 -y
-2) conda activate qc-gui
-3) conda install -c conda-forge napari pyqt -y
-4) cd /path/to/qg-gui
-5) pip install -e .
-
-
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -U pip
+pip install -e .
+```
 
 > Napari installs can be heavy; if you hit Qt issues, consider using `conda`.
 
@@ -62,3 +63,15 @@ Columns:
 - `viewed` (True/False)
 - `first_viewed_at`
 - `last_updated_at`
+
+## Keyboard shortcuts
+
+When the main window has focus (works even while the Napari viewer is focused):
+
+- `0`, `1`, `2`, `3` — set the quality score for the current slice
+- `←` / `→` — previous / next slice key
+- `N` — jump to the next **unviewed** slice (wraps around)
+
+Notes:
+- The app continues to **auto-save** the CSV on navigation and score changes.
+- Cine / time-series slices will auto-play on load (when `timepoints > 1`).
