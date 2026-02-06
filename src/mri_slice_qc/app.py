@@ -277,7 +277,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.panel.sig_select_idx.connect(self.on_select_idx)
         self.panel.sig_rating_changed.connect(self.on_rating_changed)
 
-        self.load_idx(0)
+        # self.load_idx(0)
+        # Defer first load until after the window is shown
+        self.cur_idx = 0
+        self._pending_first_load = True
+
 
     def closeEvent(self, event):
         try:
@@ -289,6 +293,16 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
         return super(MainWindow, self).closeEvent(event)
+
+    def showEvent(self, event):
+        super(MainWindow, self).showEvent(event)
+
+        if getattr(self, "_pending_first_load", False):
+            self._pending_first_load = False
+
+            # Do the first load after we're actually visible
+            QtCore.QTimer.singleShot(0, lambda: self.load_idx(0))
+
 
     def on_prev(self):
         if self.cur_idx > 0:
@@ -324,6 +338,54 @@ class MainWindow(QtWidgets.QMainWindow):
         self.panel.set_status(key, viewed, rating, self.cur_idx, len(self.keys))
         self.panel.set_rating_buttons(rating)
 
+    def _start_or_stop_animation(self, n_t: int) -> None:
+        """Start animation when n_t > 1, otherwise stop. Uses Qt dims widget when available."""
+        def _do():
+            try:
+                # First try stopping anything already running (prevents stuck state on rapid switching)
+                try:
+                    self.viewer.dims.stop()
+                except Exception:
+                    pass
+
+                qt_dims = getattr(getattr(self.viewer.window, "_qt_viewer", None), "dims", None)
+
+                if n_t > 1:
+                    # Reset to frame 0
+                    try:
+                        self.viewer.dims.set_current_step(0, 0)
+                    except Exception:
+                        pass
+
+                    # Prefer Qt dims widget (same behavior as clicking play)
+                    if qt_dims is not None:
+                        try:
+                            qt_dims.play(axis=0)
+                        except TypeError:
+                            qt_dims.play()
+                    else:
+                        # Fallback
+                        try:
+                            self.viewer.dims.play(axis=0, fps=12)
+                        except TypeError:
+                            self.viewer.dims.play(axis=0)
+                else:
+                    # Ensure stopped for single-frame data
+                    if qt_dims is not None:
+                        try:
+                            qt_dims.stop()
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+        # Give the embedded napari widget a moment to finish updating
+        QtCore.QTimer.singleShot(150, _do)
+
+
+        # 0ms works often; 25–50ms is more reliable across machines/Qt backends
+        QtCore.QTimer.singleShot(25, _do)
+
     def load_idx(self, idx: int):
         if idx < 0 or idx >= len(self.keys):
             return
@@ -350,6 +412,11 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self.img_layer.data = arr_tyx
             self.img_layer.name = "slice"
+        # Auto-play if time series
+        n_t = arr_tyx.shape[0]
+        self._start_or_stop_animation(n_t)
+
+
 
         # Mark as viewed on load
         self.store.mark_viewed(key)

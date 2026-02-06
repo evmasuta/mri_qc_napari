@@ -33,12 +33,13 @@ The GUI will display time as a Napari time axis (frames).
 
 Create an environment with Python 3.9 (3.7–3.9 should work). Example:
 
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -U pip
-pip install -e .
-```
+1) conda create -n qc-gui python=3.9 -y
+2) conda activate qc-gui
+3) conda install -c conda-forge napari pyqt -y
+4) cd /path/to/qg-gui
+5) pip install -e .
+
+
 
 > Napari installs can be heavy; if you hit Qt issues, consider using `conda`.
 
